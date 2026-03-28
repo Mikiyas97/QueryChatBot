@@ -21,7 +21,7 @@ schema = get_schema()
 def configure_ai(api_key):
     genai.configure(api_key=api_key)
     return genai
-model = configure_ai("AIzaSyC2ouZoXQEyzGGYS7CaEOTLnaqIG2y792c")
+model = configure_ai("AIzaSyDin7AtIF13M2D3-IylS-JCdoC8m4TelhY")
 system_prompt = f"""You are an expert SQL generator. Use ONLY the database schema provided.
 
 here is the database schema:\n
@@ -57,11 +57,15 @@ def ask():
         question = request.form.get("question")
         response = model_instance.generate_content(question)
 
-        query = response.text
-        cursor.execute(query)
-        results = cursor.fetchall()
-        db.close()
+        if response:
+            query = response.text
+            cursor.execute(query)
+            results = cursor.fetchall()
+            print(results)
+            db.close()
 
-        return render_template("index.html", question=question, answer=results, query=query)
+            return render_template("index.html", question=question, results=results, query=query)
+        message = "No response from AI"
+        return render_template("index.html", question=question, results=None, query="No response from AI")
     else:
         return redirect("/")
