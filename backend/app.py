@@ -1,4 +1,4 @@
-from flask import Flask, redirect, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request
 import google.generativeai as genai
 import sqlite3
 
@@ -48,26 +48,34 @@ app = Flask(__name__)
 def main():
     return render_template("index.html")
 
-@app.route("/ask", methods=["POST", "GET"])
+@app.route("/ask", methods=["POST"])
 def ask():
     if request.method == "POST":
+        data = request.get_json()
+        question = data.get("question", "").strip()
+
+        if not question:
+            return jsonify({"error": "Empty question"})
+
         db = sqlite3.connect("movies.db")
         cursor = db.cursor()
 
-        question = request.form.get("question")
         response = model_instance.generate_content(question)
-        if response:
-            query = response.text
-            cursor.execute(query)
-            results = cursor.fetchall()
-            columns = [desc[0] for desc in cursor.description]
-            columns = [col.upper() for col in columns]
-            print(columns)
-            print(results)
-            db.close()
+        query = response.text
 
-            return render_template("index.html", question=question, results=results, query=query, columns=columns)
-        message = "No response from AI"
-        return render_template("index.html", question=question, results=None, query="No response from AI")
+        cursor.execute(query)
+        results = cursor.fetchall()
+        columns = [desc[0].upper() for desc in cursor.description]
+
+        db.close()
+
+        return jsonify({
+            "question": question,
+            "query": query,
+            "columns": columns,
+            "results": results
+        })
+    
+        print(result)
     else:
         return redirect("/")
