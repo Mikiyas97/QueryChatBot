@@ -56,15 +56,17 @@ def ask():
 
         question = request.form.get("question")
         response = model_instance.generate_content(question)
-
         if response:
             query = response.text
             cursor.execute(query)
             results = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            columns = [col.upper() for col in columns]
+            print(columns)
             print(results)
             db.close()
 
-            return render_template("index.html", question=question, results=results, query=query)
+            return render_template("index.html", question=question, results=results, query=query, columns=columns)
         message = "No response from AI"
         return render_template("index.html", question=question, results=None, query="No response from AI")
     else:
