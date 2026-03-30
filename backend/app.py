@@ -66,6 +66,7 @@ def ask():
             print(results)
             db.close()
 
+
             return render_template("index.html", question=question, results=results, query=query, columns=columns)
         message = "No response from AI"
         return render_template("index.html", question=question, results=None, query="No response from AI")
