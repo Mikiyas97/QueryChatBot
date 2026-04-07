@@ -35,7 +35,13 @@
     <!-- Input -->
     <form action="/ask" method="post">
       <div class="border-t border-gray-700 p-3 flex items-center gap-2">
-
+          <!-- + BUTTON -->
+        <button id="upload-btn"
+          class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xl transition">
+          +
+        </button>
+        <!-- HIDDEN FILE INPUT -->
+        <input type="file" id="file-input" class="hidden">
         <!-- Input -->
         <input
           type="text"

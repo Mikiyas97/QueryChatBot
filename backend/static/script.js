@@ -1,9 +1,22 @@
-let messageInput = document.getElementById("message-input");
-let chatBox = document.getElementById("chat-box");
-let fileInput = document.getElementById("file-input");
-let submitBtn = document.getElementById("submit-btn");
-const form = document.querySelector("form");
+let messageInput = document.getElementById("message-input"); // MESSAGE INPUT FIELD
+let chatBox = document.getElementById("chat-box"); // CHAT BOX CONTAINER
+let submitBtn = document.getElementById("submit-btn"); // SUBMIT BUTTON
+const form = document.querySelector("form"); // FORM ELEMENT
+const uploadBtn = document.getElementById("upload-btn"); // + BUTTON
+const fileInput = document.getElementById("file-input"); // HIDDEN FILE INPUT
 
+// upload file to Flask to upload route
+function uploadFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  fetch("/upload", {
+    method: "POST",
+    body: formData
+  })
+  .then(response => response.json())};
+
+// render table for query output
 function createTable(columns, results) {
   // table with light background and subtle borders
   let table = "<table class='min-w-full border border-gray-200 rounded-lg bg-white'>";
@@ -29,6 +42,18 @@ function createTable(columns, results) {
 
   return table;
 }
+
+// select file
+uploadBtn.addEventListener("click", () => {
+  fileInput.click();
+});
+// change if then upload
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files[0]; // selects the first file
+
+  uploadFile(file); // call javascript upload function to send file to Flask
+});
+
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
