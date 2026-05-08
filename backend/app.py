@@ -1,26 +1,14 @@
 import os
-import sys
+import sqlite3
+import json
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
+import google.generativeai as genai
 from dotenv import load_dotenv, find_dotenv
 
-# Load environment variables first
+# Load environment variables
 load_dotenv(find_dotenv())
 
-# Add current directory to path so imports work on Vercel
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-
-# Import our custom modules after environment is loaded and path is set
-try:
-    from database import execute_query
-    from ai_service import ask_gemini
-except ImportError:
-    # Fallback for different execution environments
-    from .database import execute_query
-    from .ai_service import ask_gemini
-
-# Get the directory of the current file
+# Get absolute path of the backend directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(
@@ -30,42 +18,84 @@ app = Flask(
 )
 
 # Configs
-UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', '/tmp/uploads') # Use /tmp for Vercel
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+DATABASE_NAME = os.getenv('DATABASE_NAME', os.path.join(BASE_DIR, 'movies.db'))
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
+
+def get_schema():
+    try:
+        db = sqlite3.connect(DATABASE_NAME)
+        cursor = db.cursor()
+        cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        schema = "Database schema:\n"
+        for table_name, create_sql in tables:
+            schema += create_sql + "\n"
+        db.close()
+        return schema
+    except Exception as e:
+        return f"Error loading schema: {str(e)}"
+
+# Lazy load AI to prevent crash if API key is missing at start
+_chat_session = None
+
+def get_chat():
+    global _chat_session
+    if _chat_session is None:
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY is missing")
+        
+        genai.configure(api_key=GEMINI_API_KEY)
+        schema = get_schema()
+        
+        system_prompt = f"""You are an expert SQL generator and data assistant. Use ONLY the database schema provided.
+
+here is the database schema:
+{schema}
+
+Rules:
+- Return a JSON object with two keys:
+    1. "explanation": A brief, friendly explanation of what you are doing or what you found.
+    2. "sql_query": The raw SQL query to get the data.
+- If the user asks a general question that doesn't require a database query, answer in the "explanation" and set "sql_query" to "NONE".
+- Return ONLY the JSON object. No markdown formatting.
+"""
+        model = genai.GenerativeModel(
+            model_name=MODEL_NAME, 
+            system_instruction=system_prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        _chat_session = model.start_chat(history=[])
+    return _chat_session
 
 @app.route("/", methods=["GET"])
 def main():
-    print("Serving index.html")
     return render_template("index.html")
-
-# Ensure static files are served correctly even on Vercel
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory(os.path.join(BASE_DIR, 'static'), path)
 
 @app.route("/ask", methods=["POST"])
 def ask():
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-        
-    question = data.get("question", "").strip()
+    question = data.get("question", "").strip() if data else ""
+
     if not question:
         return jsonify({"error": "Empty question"}), 400
 
     try:
-        # Get JSON response from Gemini
-        response_data = ask_gemini(question)
-
-        explanation = response_data.get("explanation", "")
-        query = response_data.get("sql_query", "").strip()
+        chat = get_chat()
+        response = chat.send_message(question)
+        res_data = json.loads(response.text)
+        
+        explanation = res_data.get("explanation", "")
+        query = res_data.get("sql_query", "").strip()
 
         columns, results = [], []
-
-        # Only execute if a query is provided and it's not "NONE"
         if query and query.upper() != "NONE":
-            columns, results = execute_query(query)
+            db = sqlite3.connect(DATABASE_NAME)
+            cursor = db.cursor()
+            cursor.execute(query)
+            results = cursor.fetchall()
+            columns = [desc[0].upper() for desc in cursor.description]
+            db.close()
 
         return jsonify({
             "question": question,
@@ -74,31 +104,14 @@ def ask():
             "columns": columns,
             "results": results
         })
-
     except Exception as e:
-        print(f"Error in /ask: {str(e)}") # Log error for Vercel logs
         return jsonify({"error": str(e)}), 500
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+# Vercel-specific static route
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory(app.static_folder, path)
 
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-
-    # Note: On Vercel, this is temporary and will be cleared
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(filepath)
-
-    return jsonify({
-        "message": "File uploaded successfully (temporary)",
-        "filename": file.filename
-    })
-
-# Export the app for Vercel
-# Vercel needs the 'app' variable to be available
 application = app
 
 if __name__ == '__main__':
