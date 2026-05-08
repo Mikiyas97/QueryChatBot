@@ -1,6 +1,6 @@
 import os
 import sys
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
 from dotenv import load_dotenv, find_dotenv
 
 # Load environment variables first
@@ -36,7 +36,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route("/", methods=["GET"])
 def main():
+    print("Serving index.html")
     return render_template("index.html")
+
+# Ensure static files are served correctly even on Vercel
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), path)
 
 @app.route("/ask", methods=["POST"])
 def ask():
