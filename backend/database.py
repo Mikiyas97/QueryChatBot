@@ -1,7 +1,10 @@
 import sqlite3
 import os
 
-DATABASE_NAME = os.getenv('DATABASE_NAME', 'movies.db')
+# Get the directory of the current file (backend folder)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Default to movies.db in the same folder as database.py
+DATABASE_NAME = os.getenv('DATABASE_NAME', os.path.join(BASE_DIR, 'movies.db'))
 
 def get_schema():
     db = sqlite3.connect(DATABASE_NAME)
