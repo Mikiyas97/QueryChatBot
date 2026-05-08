@@ -60,12 +60,30 @@ Rules:
 - If the user asks a general question that doesn't require a database query, answer in the "explanation" and set "sql_query" to "NONE".
 - Return ONLY the JSON object. No markdown formatting.
 """
+        # Configure model
         model = genai.GenerativeModel(
-            model_name=MODEL_NAME, 
-            system_instruction=system_prompt,
+            model_name=MODEL_NAME,
             generation_config={"response_mime_type": "application/json"}
         )
-        _chat_session = model.start_chat(history=[])
+        
+        # In newer versions of the library, we can't always pass system_instruction 
+        # as a keyword if the version pinned is somehow overridden or cached.
+        # We will use the start_chat with a system message in history or 
+        # simply use the system_instruction attribute if it's modern.
+        try:
+            # Modern way
+            model = genai.GenerativeModel(
+                model_name=MODEL_NAME, 
+                system_instruction=system_prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            _chat_session = model.start_chat(history=[])
+        except TypeError:
+            # Fallback for very old versions (though >=0.4.0 should be fine)
+            _chat_session = model.start_chat(history=[
+                {"role": "user", "parts": [system_prompt]},
+                {"role": "model", "parts": ["Understood. I will act as your SQL generator with the provided schema and rules."]}
+            ])
     return _chat_session
 
 @app.route("/", methods=["GET"])
