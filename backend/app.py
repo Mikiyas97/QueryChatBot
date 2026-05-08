@@ -20,7 +20,14 @@ except ImportError:
     from .database import execute_query
     from .ai_service import ask_gemini
 
-app = Flask(__name__)
+# Get the directory of the current file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static')
+)
 
 # Configs
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', '/tmp/uploads') # Use /tmp for Vercel
