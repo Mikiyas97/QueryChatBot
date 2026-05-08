@@ -28,25 +28,29 @@ def ask():
 
         if not question:
             return jsonify({"error": "Empty question"})
+    try:
+        # Get JSON response from Gemini
+        response_data = ask_gemini(question)
 
-        try:
-            # Get JSON response from Gemini
-            response_data = ask_gemini(question)
-            
-            explanation = response_data.get("explanation", "")
-            query = response_data.get("sql_query", "")
+        explanation = response_data.get("explanation", "")
+        query = response_data.get("sql_query", "").strip()
 
-            # Execute the generated query
+        columns, results = [], []
+
+        # Only execute if a query is provided and it's not "NONE"
+        if query and query.upper() != "NONE":
             columns, results = execute_query(query)
 
-            return jsonify({
-                "question": question,
-                "explanation": explanation,
-                "columns": columns,
-                "results": results
-            })
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "question": question,
+            "explanation": explanation,
+            "query": query if query.upper() != "NONE" else None,
+            "columns": columns,
+            "results": results
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     else:
         return redirect("/")
 
