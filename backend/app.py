@@ -1,18 +1,29 @@
 import os
+import sys
 from flask import Flask, jsonify, redirect, render_template, request
 from dotenv import load_dotenv, find_dotenv
 
 # Load environment variables first
 load_dotenv(find_dotenv())
 
-# Import our custom modules after environment is loaded
-from database import execute_query
-from ai_service import ask_gemini
+# Add current directory to path so imports work on Vercel
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+# Import our custom modules after environment is loaded and path is set
+try:
+    from database import execute_query
+    from ai_service import ask_gemini
+except ImportError:
+    # Fallback for different execution environments
+    from .database import execute_query
+    from .ai_service import ask_gemini
 
 app = Flask(__name__)
 
 # Configs
-UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
+UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', '/tmp/uploads') # Use /tmp for Vercel
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -22,12 +33,14 @@ def main():
 
 @app.route("/ask", methods=["POST"])
 def ask():
-    if request.method == "POST":
-        data = request.get_json()
-        question = data.get("question", "").strip()
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+        
+    question = data.get("question", "").strip()
+    if not question:
+        return jsonify({"error": "Empty question"}), 400
 
-        if not question:
-            return jsonify({"error": "Empty question"})
     try:
         # Get JSON response from Gemini
         response_data = ask_gemini(question)
@@ -50,9 +63,8 @@ def ask():
         })
 
     except Exception as e:
+        print(f"Error in /ask: {str(e)}") # Log error for Vercel logs
         return jsonify({"error": str(e)}), 500
-    else:
-        return redirect("/")
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -60,17 +72,21 @@ def upload_file():
         return jsonify({"error": "No file part"}), 400
 
     file = request.files['file']
-
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
+    # Note: On Vercel, this is temporary and will be cleared
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(filepath)
 
     return jsonify({
-        "message": "File uploaded successfully",
+        "message": "File uploaded successfully (temporary)",
         "filename": file.filename
     })
+
+# Export the app for Vercel
+# Vercel needs the 'app' variable to be available
+application = app
 
 if __name__ == '__main__':
     app.run(debug=True)
