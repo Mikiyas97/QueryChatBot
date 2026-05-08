@@ -1,63 +1,25 @@
-from flask import Flask, jsonify, redirect, render_template, request
-import google.generativeai as genai
-import sqlite3
 import os
+from flask import Flask, jsonify, redirect, render_template, request
+from dotenv import load_dotenv, find_dotenv
 
+# Load environment variables first
+load_dotenv(find_dotenv())
+
+# Import our custom modules after environment is loaded
+from database import execute_query
+from ai_service import ask_gemini
 
 app = Flask(__name__)
-#configs
-UPLOAD_FOLDER = 'uploads'
+
+# Configs
+UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-
-
-def get_schema():
-    db = sqlite3.connect("movies.db")
-    cursor = db.cursor()
-    cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
-    schema = "Database schema:\n"
-    for table_name, create_sql in tables:
-        schema += create_sql + "\n"
-    db.close()
-    return schema
-
-schema = get_schema()
-
-def configure_ai(api_key):
-    genai.configure(api_key=api_key)
-    return genai
-
-model = configure_ai("AIzaSyDin7AtIF13M2D3-IylS-JCdoC8m4TelhY")
-system_prompt = f"""You are an expert SQL generator. Use ONLY the database schema provided.
-
-here is the database schema:\n
-{schema}
-
-Rules:
-- Return raw SQL only. No markdown, explanations, or comments.
-- Do NOT invent tables or columns that are not in the schema.
-- Fix typos and messy input in user questions automatically.
-- If a question mentions numbers, ranges, or patterns, use the schema column types to generate correct SQL.
-- Use JOINs if necessary, based on the schema relationships (primary/foreign keys).
-- Use COUNT, SUM, AVG when user asks for totals or averages.
-- Assume all columns and table names are exactly as provided in the schema.
-"""
-model_instance = model.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=system_prompt)
-chat_session = model_instance.start_chat(history=[])
-
-
-
-
-
 
 @app.route("/", methods=["GET"])
 def main():
     return render_template("index.html")
 
-#ask questions and get SQL queries
 @app.route("/ask", methods=["POST"])
 def ask():
     if request.method == "POST":
@@ -67,30 +29,26 @@ def ask():
         if not question:
             return jsonify({"error": "Empty question"})
 
-        db = sqlite3.connect("movies.db")
-        cursor = db.cursor()
+        try:
+            # Get JSON response from Gemini
+            response_data = ask_gemini(question)
+            
+            explanation = response_data.get("explanation", "")
+            query = response_data.get("sql_query", "")
 
-        response = chat_session.send_message(question)
-        query = response.text
+            # Execute the generated query
+            columns, results = execute_query(query)
 
-        cursor.execute(query)
-        results = cursor.fetchall()
-        columns = [desc[0].upper() for desc in cursor.description]
-
-        db.close()
-
-        return jsonify({
-            "question": question,
-            "query": query,
-            "columns": columns,
-            "results": results
-        })
-    
-        print(result)
+            return jsonify({
+                "question": question,
+                "explanation": explanation,
+                "columns": columns,
+                "results": results
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     else:
         return redirect("/")
-    
-# folder to save uploads
 
 @app.route('/upload', methods=['POST'])
 def upload_file():

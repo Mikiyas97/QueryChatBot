@@ -81,26 +81,44 @@ form.addEventListener("submit", async (event) => {
 
   const data = await response.json();
   console.log(data);
-  console.log(data.results);
 
-  // show AI query
-  chatBox.innerHTML += `
-    <div class="flex justify-start">
-      <div class="bg-gray-700 px-4 py-2 rounded-lg">
-        ${data.query}
-      </div>
-    </div>
-  `;
-
-  // show results table if there are any
-  if (data.results && data.results.length > 0) {
+  if (data.error) {
     chatBox.innerHTML += `
-      <div class="flex justify-start mb-3 w-full">
-        <div class="bg-black text-white-800 px-4 py-3 rounded-2xl max-w-full overflow-x-auto">
-          ${createTable(data.columns, data.results)}
+      <div class="flex justify-start">
+        <div class="bg-red-500 text-white px-4 py-2 rounded-lg">
+          Error: ${data.error}
         </div>
       </div>
     `;
+  } else {
+    // show AI explanation
+    chatBox.innerHTML += `
+      <div class="flex justify-start">
+        <div class="bg-gray-800 text-white px-4 py-2 rounded-lg max-w-lg">
+          <p class="text-sm font-medium mb-1 text-yellow-400">Assistant:</p>
+          <p class="text-gray-200">${data.explanation}</p>
+        </div>
+      </div>
+    `;
+
+    // show results table if there are any
+    if (data.results && data.results.length > 0) {
+      chatBox.innerHTML += `
+        <div class="flex justify-start mb-3 w-full">
+          <div class="bg-black text-white-800 px-4 py-3 rounded-2xl max-w-full overflow-x-auto">
+            ${createTable(data.columns, data.results)}
+          </div>
+        </div>
+      `;
+    } else if (data.results && data.results.length === 0) {
+        chatBox.innerHTML += `
+        <div class="flex justify-start">
+          <div class="bg-gray-800 text-gray-400 px-4 py-2 rounded-lg italic">
+            No results found.
+          </div>
+        </div>
+      `;
+    }
   }
 
   // scroll to bottom
