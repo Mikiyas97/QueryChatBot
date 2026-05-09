@@ -1,7 +1,7 @@
 import os
-import sqlite3
 import json
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
+import psycopg2
+from flask import Flask, jsonify, render_template, request, send_from_directory
 import google.generativeai as genai
 from dotenv import load_dotenv, find_dotenv
 
@@ -18,33 +18,33 @@ app = Flask(
 )
 
 # Configs
-DATABASE_NAME = os.getenv('DATABASE_NAME', os.path.join(BASE_DIR, 'movies.db'))
+DATABASE_URL = os.getenv('DATABASE_URL')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
 
+def get_db_connection():
+    return psycopg2.connect(DATABASE_URL, sslmode='require')
+
 def get_schema():
-    print(f"Attempting to load schema from: {DATABASE_NAME}")
-    if not os.path.exists(DATABASE_NAME):
-        print(f"DATABASE NOT FOUND AT: {DATABASE_NAME}")
-        # Try to list files in BASE_DIR to see what's actually there
-        try:
-            print(f"Files in {BASE_DIR}: {os.listdir(BASE_DIR)}")
-        except:
-            pass
-        return "Error: movies.db file not found in the backend directory."
-        
+    print("Attempting to load schema from PostgreSQL")
     try:
-        db = sqlite3.connect(DATABASE_NAME)
-        cursor = db.cursor()
-        cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        if not tables:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT table_name, column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public';
+        """)
+        columns = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        if not columns:
             return "Error: Database is empty (no tables found)."
             
-        schema = "Database schema:\n"
-        for table_name, create_sql in tables:
-            schema += create_sql + "\n"
-        db.close()
+        schema = "Database schema (Tables and Columns):\n"
+        for table, col, dtype in columns:
+            schema += f"{table}: {col} ({dtype})\n"
         print("Schema loaded successfully.")
         return schema
     except Exception as e:
@@ -123,12 +123,13 @@ def ask():
 
         columns, results = [], []
         if query and query.upper() != "NONE":
-            db = sqlite3.connect(DATABASE_NAME)
-            cursor = db.cursor()
-            cursor.execute(query)
-            results = cursor.fetchall()
-            columns = [desc[0].upper() for desc in cursor.description]
-            db.close()
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(query)
+            results = cur.fetchall()
+            columns = [desc[0].upper() for desc in cur.description]
+            cur.close()
+            conn.close()
 
         return jsonify({
             "question": question,
