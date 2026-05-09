@@ -23,17 +23,32 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
 
 def get_schema():
+    print(f"Attempting to load schema from: {DATABASE_NAME}")
+    if not os.path.exists(DATABASE_NAME):
+        print(f"DATABASE NOT FOUND AT: {DATABASE_NAME}")
+        # Try to list files in BASE_DIR to see what's actually there
+        try:
+            print(f"Files in {BASE_DIR}: {os.listdir(BASE_DIR)}")
+        except:
+            pass
+        return "Error: movies.db file not found in the backend directory."
+        
     try:
         db = sqlite3.connect(DATABASE_NAME)
         cursor = db.cursor()
         cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
+        if not tables:
+            return "Error: Database is empty (no tables found)."
+            
         schema = "Database schema:\n"
         for table_name, create_sql in tables:
             schema += create_sql + "\n"
         db.close()
+        print("Schema loaded successfully.")
         return schema
     except Exception as e:
+        print(f"Error loading schema: {str(e)}")
         return f"Error loading schema: {str(e)}"
 
 # Lazy load AI to prevent crash if API key is missing at start
