@@ -20,7 +20,7 @@ app = Flask(
 # Configs
 DATABASE_NAME = os.getenv('DATABASE_NAME', 'movies.db')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-1.5-flash')
 
 def get_db_connection():
     db_path = os.path.join(BASE_DIR, DATABASE_NAME)
