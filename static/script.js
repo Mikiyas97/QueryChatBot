@@ -145,7 +145,7 @@ function appendWelcomeMessage() {
     appendMessage('🤖', `
         Hello! I'm your movie database expert. I can help you find ratings, release dates, or even perform complex analysis across the IMDb dataset.
         <div class="flex gap-2 flex-wrap mt-4">
-            <button onclick="fillAndSend('Top 10 movies based on rating')" class="text-xs bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shadow-sm">Top 5 Action</button>
+            <button onclick="fillAndSend('Show me the top 10 highest rated movies')" class="text-xs bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shadow-sm">Top 10 movies based on rating</button>
             <button onclick="fillAndSend('Which movies were released in 2023?')" class="text-xs bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shadow-sm">Released 2023</button>
         </div>
     `, 'ai', '', false);
