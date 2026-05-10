@@ -1,6 +1,6 @@
 import os
 import json
-import psycopg2
+import sqlite3
 from flask import Flask, jsonify, render_template, request, send_from_directory
 import google.generativeai as genai
 from dotenv import load_dotenv, find_dotenv
@@ -18,33 +18,39 @@ app = Flask(
 )
 
 # Configs
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_NAME = os.getenv('DATABASE_NAME', 'movies.db')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL, sslmode='require')
+    db_path = os.path.join(BASE_DIR, DATABASE_NAME)
+    conn = sqlite3.connect(db_path)
+    return conn
 
 def get_schema():
-    print("Attempting to load schema from PostgreSQL")
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT table_name, column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_schema = 'public';
-        """)
-        columns = cur.fetchall()
-        cur.close()
-        conn.close()
+    db_path = os.path.join(BASE_DIR, DATABASE_NAME)
+    print(f"Attempting to load schema from: {db_path}")
+    if not os.path.exists(db_path):
+        print(f"DATABASE NOT FOUND AT: {db_path}")
+        # Try to list files in BASE_DIR to see what's actually there
+        try:
+            print(f"Files in {BASE_DIR}: {os.listdir(BASE_DIR)}")
+        except:
+            pass
+        return f"Error: {DATABASE_NAME} file not found in the backend directory."
         
-        if not columns:
+    try:
+        db = sqlite3.connect(db_path)
+        cursor = db.cursor()
+        cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        if not tables:
             return "Error: Database is empty (no tables found)."
             
-        schema = "Database schema (Tables and Columns):\n"
-        for table, col, dtype in columns:
-            schema += f"{table}: {col} ({dtype})\n"
+        schema = "Database schema:\n"
+        for table_name, create_sql in tables:
+            schema += create_sql + "\n"
+        db.close()
         print("Schema loaded successfully.")
         return schema
     except Exception as e:
