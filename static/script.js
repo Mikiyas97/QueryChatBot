@@ -255,5 +255,28 @@ chatForm.addEventListener("submit", async (event) => {
   }
 });
 
+// Handle mobile virtual keyboard resizing
+function handleViewportResize() {
+  const container = document.querySelector('.h-screen-safe');
+  if (window.visualViewport) {
+    const setHeight = () => {
+      container.style.height = `${window.visualViewport.height}px`;
+      // Scroll chat to bottom when keyboard opens/closes
+      chatBox.scrollTop = chatBox.scrollHeight;
+    };
+    window.visualViewport.addEventListener('resize', setHeight);
+    window.visualViewport.addEventListener('scroll', setHeight);
+    setHeight();
+  }
+}
+
+// Prevent iOS from scrolling the whole page when focusing on input
+messageInput.addEventListener('focus', () => {
+  setTimeout(() => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }, 300);
+});
+
 // Initial call
+handleViewportResize();
 init();
